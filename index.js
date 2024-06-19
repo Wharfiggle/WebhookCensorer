@@ -54,30 +54,117 @@ for(const file of eventFiles)
 		client.on(event.name, (...args) => event.execute(...args));
 }
 
-//function that takes in a string and returns an array of arrays of size 2:
-//0th element: the word, 1st element: the word's location in the string
-function getBadWords(string)
+
+
+//		custom code for webhook censorer
+
+const readline = require('readline');
+var badWordLines;
+
+//reads badwords.txt and parses data
+async function readTextFile()
 {
-	return [""];
+	const fileStream = fs.createReadStream("./badwords.txt");
+	const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+	//we use the crlfDelay option to recognize all instances of CR LF ('\r\n') in input.txt as a single line break
+	var lines = [];
+	for await(line of rl) //for each line in the text file 
+	{
+		const words = line.split(/\s+/); //split line into array of words by whitespace
+		while(lines.length < words.length)
+		{ lines.push([]); }
+		lines[words.length - 1].push(words); //lines[0] = array of all lines with 1 word, lines[1] = all lines with 2 words, etc
+	}
+	return lines;
+}
+
+//function that takes in a string and returns the string with any detected bad words censored out
+async function getCensoredString(string)
+{
+	if(!badWordLines) //if text file hasnt been read then read it
+		badWordLines = await readTextFile();
+
+	var badWords = [];
+	const strWords = string.split(/\s+/);
+	const strWordsOrig = [...strWords];
+	for(var wordCount = badWordLines.length - 1; wordCount >= 0; wordCount--)
+	{
+		if(wordCount >= strWords.length) //if this section of bad words has more words than our string, dont bother processing it
+			continue;
+		for(line of badWordLines[wordCount])
+		{
+			for(var i = 0; i < strWords.length - wordCount; i++)
+			{
+				for(var w = 0; w < line.length; w++)
+				{
+					if(strWords[w + i] != line[w])
+						break;
+					else if(w == line.length - 1) //made it to the end of the bad word line without finding any mismatches
+					{
+						strWords.splice(i, line.length); //remove words from strWords to focus on processing the rest of the string
+						//push each word's index to badWords
+						for(var j = 0; j < line.length; j++)
+						{ badWords.push(i + j); }
+						i -= 1;
+					}
+				}
+			}
+		}
+	}
+	
+	if(badWords.length < 1) //no bad words detected, return original string
+		return string;
+
+	const censoredCharacters = ['!', '@', '$', '%', '^', '&'];
+	var charsLeft = [...censoredCharacters];
+
+	//assemble final string with bad words replaced with chars from censoredCharacters
+	var finalString = "";
+	for(var i = 0; i < strWordsOrig.length; i++)
+	{
+		if(badWords.includes(i))
+		{
+			for(j in strWordsOrig[i])
+			{
+				const rn = Math.floor(Math.random() * charsLeft.length);
+				const char = charsLeft.splice(rn, 1)[0]; //remove and store last used character so we cant use the same character twice in a row
+				finalString += char;
+				if(charsLeft.length == 0)
+				{
+					charsLeft = [...censoredCharacters];
+					charsLeft.splice(charsLeft.indexOf(char), 1); //remove last used character
+				}
+			}
+		}
+		else
+			finalString += strWordsOrig[i]
+		
+		if(i < strWordsOrig.length - 1)
+			finalString += " ";
+	}
+
+	return finalString;
 }
 
 var webhooks = [];
 client.on('messageCreate', async (message) =>
 {
-	if(!message.webhookId) //not a webhook
+	if(message.webhookId) //is a webhook
+	{
+		if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
+			return;
+	}
+
+	var username = message.author.username; //webhook nickname
+	if(message.member != null)
+		username = message.member.nickname; //user nickname
+	const censoredName = await getCensoredString(username);
+	const censoredMsg = await getCensoredString(message.content);
+
+	if(censoredName == message.author.username && censoredMsg == message.content) //nothing to censor
 		return;
 
-	if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
-		return;
-
-	console.log("!!!!!!!!!!!!!!!!!!!!!");
-	console.log(message.author.username + " said: ");
-	console.log(message.content);
-	const badWordsName = getBadWords(message.author.username);
-	const badWordsMsg = getBadWords(message.content);
-	
-	if(badWordsName.length == 0 && badWordsMsg.length == 0) //nothing to censor
-		return;
+	console.log(`${message.author.username} said: ${message.content}`);
 
 	try
 	{
@@ -120,13 +207,17 @@ client.on('messageCreate', async (message) =>
 
 		await webhook.send(
 		{
-			content: 'Yeah okay buddy!',
-			username: message.author.username,
+			content: censoredMsg,
+			username: censoredName,
 			avatarURL: message.author.displayAvatarURL()
 		});
+
+		message.delete();
 	}
 	catch(error) { console.error('Error trying to send a message: ', error); }
 });
+
+
 
 // Log in to Discord with your client's token
 const { token } = require("./config.json");
