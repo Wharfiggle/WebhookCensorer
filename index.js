@@ -81,6 +81,9 @@ async function readTextFile()
 //function that takes in a string and returns the string with any detected bad words censored out
 async function getCensoredString(string)
 {
+	if(string == null)
+		return null;
+
 	if(!badWordLines) //if text file hasnt been read then read it
 		badWordLines = await readTextFile();
 
