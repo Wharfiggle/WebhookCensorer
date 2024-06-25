@@ -166,7 +166,8 @@ client.on('messageCreate', async (message) =>
 		if(message.webhookId) //is a webhook
 		{
 			isWebhook = true;
-			if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
+			const firstWebhook = webhooks.first();
+			if(firstWebhook && firstWebhook.id == message.webhookId) //webhook is ours
 				return;
 		}
 
@@ -211,6 +212,8 @@ client.on('messageCreate', async (message) =>
 			}
 
 			webhooks.set(webhook.channel, webhook);
+			if(webhook.id == message.webhookId)
+				return;
 		}
 
 		await webhook.send(
