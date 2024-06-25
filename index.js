@@ -85,7 +85,12 @@ async function getCensoredString(string)
 		badWordLines = await readTextFile();
 
 	var badWords = [];
-	const strWords = string.split(/\s+/);
+	const regMatchWords = [...string.matchAll(/([^A-Za-z\s]?\w+)+(?=\s|$|[^A-Za-z\s])/g)];
+	var strWords = [];
+	//make array of just the strings from regex matches
+	for(word of regMatchWords)
+	{ strWords.push(word[0]); }
+	//make copy of strWords
 	const strWordsOrig = [...strWords];
 	for(var wordCount = badWordLines.length - 1; wordCount >= 0; wordCount--)
 	{
@@ -97,7 +102,7 @@ async function getCensoredString(string)
 			{
 				for(var w = 0; w < line.length; w++)
 				{
-					if(strWords[w + i] != line[w])
+					if(strWords[w + i].toLowerCase() != line[w].toLowerCase())
 						break;
 					else if(w == line.length - 1) //made it to the end of the bad word line without finding any mismatches
 					{
@@ -146,42 +151,38 @@ async function getCensoredString(string)
 	return finalString;
 }
 
-var webhooks = [];
+const webhooks = new Collection();
 client.on('messageCreate', async (message) =>
 {
+	var isWebhook = false;
 	if(message.webhookId) //is a webhook
 	{
+		isWebhook = true;
 		if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
 			return;
 	}
 
-	var username = message.author.username; //webhook nickname
-	if(message.member != null)
+	if(isWebhook)
+		var username = message.author.username; //webhook nickname
+	else
 		username = message.member.nickname; //user nickname
 	const censoredName = await getCensoredString(username);
 	const censoredMsg = await getCensoredString(message.content);
 
-	if(censoredName == message.author.username && censoredMsg == message.content) //nothing to censor
+	if(censoredName == username && censoredMsg == message.content) //nothing to censor
 		return;
 
 	console.log(`${message.author.username} said: ${message.content}`);
 
+	//get appropriate webhook and send message with it
 	try
 	{
 		//find our webhook among the previously used webhooks
-		var webhook;
-		for(w of webhooks)
-		{
-			if(w.channel == message.channel)
-			{
-				webhook = w;
-				break;
-			}
-		}
+		var webhook = webhooks.get(message.channel);
 
 		if(!webhook) //havent used the needed webhook yet
 		{
-			//find our webhook
+			//find our webhook in the server
 			const foundWebhooks = await message.channel.fetchWebhooks();
 			webhook = foundWebhooks.find(wh => wh.token);
 
@@ -200,9 +201,7 @@ client.on('messageCreate', async (message) =>
 				});
 			}
 
-			webhooks.push(webhook);
-			if(webhooks.length == 1 && webhook.id == message.webhookId) //webhook is ours
-				return;
+			webhooks.set(webhook.channel, webhook);
 		}
 
 		await webhook.send(
