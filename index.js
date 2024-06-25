@@ -58,6 +58,7 @@ for(const file of eventFiles)
 
 //		custom code for webhook censorer
 
+const wait = require('node:timers/promises').setTimeout;
 const readline = require('readline');
 var badWordLines;
 
@@ -157,29 +158,34 @@ async function getCensoredString(string)
 const webhooks = new Collection();
 client.on('messageCreate', async (message) =>
 {
-	var isWebhook = false;
-	if(message.webhookId) //is a webhook
-	{
-		isWebhook = true;
-		if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
-			return;
-	}
+	await wait(2000); //wait to see if message is intercepted by other bots
 
-	if(isWebhook)
-		var username = message.author.username; //webhook nickname
-	else
-		username = message.member.nickname; //user nickname
-	const censoredName = await getCensoredString(username);
-	const censoredMsg = await getCensoredString(message.content);
-
-	if(censoredName == username && censoredMsg == message.content) //nothing to censor
-		return;
-
-	console.log(`${message.author.username} said: ${message.content}`);
-
-	//get appropriate webhook and send message with it
 	try
 	{
+		var isWebhook = false;
+		if(message.webhookId) //is a webhook
+		{
+			isWebhook = true;
+			if(webhooks.length > 0 && webhooks[0].id == message.webhookId) //webhook is ours
+				return;
+		}
+
+		if(isWebhook)
+			var username = message.author.username; //webhook nickname
+		else
+			username = message.member.nickname; //user nickname
+		const censoredName = await getCensoredString(username);
+		const censoredMsg = await getCensoredString(message.content);
+
+		if(censoredName == username && censoredMsg == message.content) //nothing to censor
+			return;
+
+		console.log(`${message.author.username} said: ${message.content}`);
+
+		//delete old message, get appropriate webhook and send message with it
+		
+		await message.delete();
+
 		//find our webhook among the previously used webhooks
 		var webhook = webhooks.get(message.channel);
 
@@ -213,10 +219,8 @@ client.on('messageCreate', async (message) =>
 			username: censoredName,
 			avatarURL: message.author.displayAvatarURL()
 		});
-
-		message.delete();
 	}
-	catch(error) { console.error('Error trying to send a message: ', error); }
+	catch(error) { console.error("Error trying to send a message: ", error); }
 });
 
 
