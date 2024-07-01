@@ -159,7 +159,8 @@ const webhooks = new Collection();
 client.on('messageCreate', async (message) =>
 {
 	await wait(2000); //wait to see if message is intercepted by other bots
-
+	if(!message) //message has already been deleted
+		return
 	try
 	{
 		var isWebhook = false;
