@@ -94,27 +94,23 @@ async function getCensoredString(string)
 	//make array of just the strings from regex matches
 	for(word of regMatchWords)
 	{ strWords.push(word[0]); }
-	//make copy of strWords
-	const strWordsOrig = [...strWords];
 	for(var wordCount = badWordLines.length - 1; wordCount >= 0; wordCount--)
 	{
-		if(wordCount >= strWords.length) //if this section of bad words has more words than our string, dont bother processing it
+		if(wordCount >= strWords.length - badWords.length) //if this section of bad words has more words than left in our string, dont bother processing it
 			continue;
 		for(line of badWordLines[wordCount])
 		{
-			for(var i = 0; i < strWords.length - wordCount; i++)
+			for(var i = strWords.length - line.length; i >= 0; i--)
 			{
-				for(var w = 0; w < line.length; w++)
+				for(var w = wordCount; w >= 0; w--)
 				{
 					if(strWords[w + i].toLowerCase() != line[w].toLowerCase())
 						break;
-					else if(w == line.length - 1) //made it to the end of the bad word line without finding any mismatches
-					{
-						strWords.splice(i, line.length); //remove words from strWords to focus on processing the rest of the string
+					else if(w == 0) //made it to the end of the bad word line without finding any mismatches
+					{	
 						//push each word's index to badWords
-						for(var j = 0; j < line.length; j++)
+						for(var j = line.length - 1; j >= 0; j--)
 						{ badWords.push(i + j); }
-						i -= 1;
 					}
 				}
 			}
@@ -129,11 +125,11 @@ async function getCensoredString(string)
 
 	//assemble final string with bad words replaced with chars from censoredCharacters
 	var finalString = "";
-	for(var i = 0; i < strWordsOrig.length; i++)
+	for(var i = 0; i < strWords.length; i++)
 	{
 		if(badWords.includes(i))
 		{
-			for(j in strWordsOrig[i])
+			for(j in strWords[i])
 			{
 				const rn = Math.floor(Math.random() * charsLeft.length);
 				const char = charsLeft.splice(rn, 1)[0]; //remove and store last used character so we cant use the same character twice in a row
@@ -146,9 +142,9 @@ async function getCensoredString(string)
 			}
 		}
 		else
-			finalString += strWordsOrig[i]
+			finalString += strWords[i]
 		
-		if(i < strWordsOrig.length - 1)
+		if(i < strWords.length - 1)
 			finalString += " ";
 	}
 

@@ -11,7 +11,7 @@ module.exports =
 			.setRequired(true)),
 	async execute(interaction)
 	{
-        const numMessages = interaction.options.getInteger("number");
+        const numMessages = Math.min(100, interaction.options.getInteger("number"));
 		const messages = await interaction.channel.messages.fetch({ limit: numMessages });
 		for(m of messages)
 		{
