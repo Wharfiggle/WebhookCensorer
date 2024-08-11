@@ -213,6 +213,8 @@ client.on('messageCreate', async (message) =>
 				return;
 		}
 
+		console.log(`Censored: ${censoredName} said: ${censoredMsg}`);
+
 		await webhook.send(
 		{
 			content: censoredMsg,
