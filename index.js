@@ -89,11 +89,7 @@ async function getCensoredString(string)
 		badWordLines = await readTextFile();
 
 	var badWords = [];
-	const regMatchWords = [...string.matchAll(/([^A-Za-z\s]?\w+)+(?=\s|$|[^A-Za-z\s])/g)];
-	var strWords = [];
-	//make array of just the strings from regex matches
-	for(word of regMatchWords)
-	{ strWords.push(word[0]); }
+	var strWords = [...string.matchAll(/(\w+)+(?=\s|$|[^A-Za-z\s])/g)];
 	for(var wordCount = badWordLines.length - 1; wordCount >= 0; wordCount--)
 	{
 		if(wordCount >= strWords.length - badWords.length) //if this section of bad words has more words than left in our string, dont bother processing it
@@ -104,13 +100,14 @@ async function getCensoredString(string)
 			{
 				for(var w = wordCount; w >= 0; w--)
 				{
-					if(strWords[w + i].toLowerCase() != line[w].toLowerCase())
+					if(strWords[w + i][0].toLowerCase() != line[w].toLowerCase())
 						break;
 					else if(w == 0) //made it to the end of the bad word line without finding any mismatches
-					{	
-						//push each word's index to badWords
+					{
+						//push to badWords then remove from strWords
 						for(var j = line.length - 1; j >= 0; j--)
-						{ badWords.push(i + j); }
+						{ badWords.push(strWords[i + j]); }
+						strWords.splice(i, wordCount + 1);
 					}
 				}
 			}
@@ -123,30 +120,29 @@ async function getCensoredString(string)
 	const censoredCharacters = ['!', '@', '$', '%', '^', '&'];
 	var charsLeft = [...censoredCharacters];
 
+	//sort badWords by their indeces
+	badWords.sort((a, b) => a.index - b.index);
+
 	//assemble final string with bad words replaced with chars from censoredCharacters
-	var finalString = "";
-	for(var i = 0; i < strWords.length; i++)
+	var finalString = string.substring(0, badWords[0].index);
+	for(var i = 0; i < badWords.length; i++)
 	{
-		if(badWords.includes(i))
+		if(i > 0)
+			finalString += string.substring(finalString.length, badWords[i].index);
+		for(var j = 0; j < badWords[i][0].length; j++)
 		{
-			for(j in strWords[i])
+			const rn = Math.floor(Math.random() * charsLeft.length);
+			const char = charsLeft.splice(rn, 1)[0]; //remove and store last used character so we cant use the same character twice in a row
+			finalString += char;
+			if(charsLeft.length == 0)
 			{
-				const rn = Math.floor(Math.random() * charsLeft.length);
-				const char = charsLeft.splice(rn, 1)[0]; //remove and store last used character so we cant use the same character twice in a row
-				finalString += char;
-				if(charsLeft.length == 0)
-				{
-					charsLeft = [...censoredCharacters];
-					charsLeft.splice(charsLeft.indexOf(char), 1); //remove last used character
-				}
+				charsLeft = [...censoredCharacters];
+				charsLeft.splice(charsLeft.indexOf(char), 1); //remove last used character
 			}
 		}
-		else
-			finalString += strWords[i]
-		
-		if(i < strWords.length - 1)
-			finalString += " ";
 	}
+	if(finalString.length < string.length)
+		finalString += string.substring(finalString.length);
 
 	return finalString;
 }
